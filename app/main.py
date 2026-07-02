@@ -37,9 +37,21 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def read_root():
+    return {
+        "message": "Welcome to the SHL Assessment Recommender API. Please use POST /chat or GET /health.",
+        "endpoints": {
+            "health": "/health",
+            "chat": "/chat"
+        }
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 def health():
     return HealthResponse(status="ok")
+
 
 
 @app.post("/chat", response_model=ChatResponse)

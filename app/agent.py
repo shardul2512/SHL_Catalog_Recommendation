@@ -25,6 +25,7 @@ from app.config import (
     MAX_TURNS,
     RETRIEVAL_TOP_K,
 )
+from app import guardrails
 from app.prompts import SYSTEM_PROMPT, build_user_turn_prompt
 from app.retrieval import CatalogIndex, get_index
 
@@ -222,6 +223,20 @@ def _get_last_shortlist(messages: list, index: CatalogIndex) -> list:
 def run_turn(messages: list) -> dict:
     """messages: list of app.schemas.Message. Returns a dict matching
     ChatResponse. Never raises -- always returns a schema-valid dict."""
+    # ── Deterministic guardrail check (pre-LLM) ──────────────────────────────
+    # Fire before ANY retrieval or LLM work. Catches prompt injection and
+    # legal/compliance questions with zero model cost and 100% consistency.
+    user_msgs_raw = [m for m in messages if m.role == "user"]
+    if user_msgs_raw:
+        gr = guardrails.check(user_msgs_raw[-1].content)
+        if gr.triggered:
+            logger.info("Guardrail fired: reason=%s", gr.reason)
+            return {
+                "reply": gr.reply,
+                "recommendations": [],
+                "end_of_conversation": False,
+            }
+    # ─────────────────────────────────────────────────────────────────────────
     index = get_index()
 
     # Weight recent user messages more heavily so REFINE scenarios (where the
